@@ -137,6 +137,13 @@ API BOOL CCONV _RA_InitI( HWND hMainHWND, /*enum EmulatorID*/int nEmulatorID, co
 		g_sClientDownloadURL	= "RAPCE.zip";
 		g_sClientEXEName		= "RAPCE.exe";
 		break;
+  case RA_Libretro:
+		g_ConsoleID				= VCS;
+		g_sGetLatestClientPage	= "LatestRALibretroVersion.html";
+		g_sClientVersion		= sClientVer;
+		g_sClientName			= "RALibretro";
+		g_sClientDownloadURL	= "RALibretro.zip";
+		g_sClientEXEName		= "RALibretro.exe";
 	default:
 		break;
 	}
