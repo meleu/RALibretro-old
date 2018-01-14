@@ -1,3 +1,6 @@
 [submodule "RA_Integration/rapidjson"]
 	path = RA_Integration/rapidjson
 	url = https://github.com/miloyip/rapidjson
+[submodule "RALibretro/src/jsonsax"]
+	path = RALibretro/src/jsonsax
+	url = https://github.com/leiradel/jsonsax.git
