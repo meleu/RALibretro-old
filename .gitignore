@@ -291,11 +291,12 @@
 /RetroAchievementsKey
 /*.opendb
 /RAVBA-M/dependencies/libpng/project/vs2012/Win32/Release/libpng.lib
+/RALibretro/Makefile.cross
 /RALibretro/bin/*
 /RALibretro/src/dynlib/*.o
 /RALibretro/src/libretro/*.o
 /RALibretro/src/RA_Integration/*.o
-/RALibretro/src/SDLComponents/*.o
+/RALibretro/src/components/*.o
 /RALibretro/src/speex/*.o
 /RALibretro/src/*.o
 /RALibretro/src/menu.res
