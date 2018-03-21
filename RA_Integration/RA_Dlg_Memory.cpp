@@ -326,6 +326,13 @@ bool MemoryViewerControl::OnEditInput(UINT c)
 		bool bLowerNibble = (m_nEditNibble % 2 == 1);
 		unsigned int nByteAddress = m_nEditAddress;
 
+		if (g_MemBookmarkDialog.GetHWND() != nullptr)
+		{
+			const MemBookmark* Bookmark = g_MemBookmarkDialog.FindBookmark(nByteAddress);
+			if (Bookmark != NULL)
+				g_MemBookmarkDialog.WriteFrozenValue(*Bookmark);
+		}
+
 		if (m_nDataSize == 0)
 		{
 			//	8 bit
@@ -609,7 +616,13 @@ void MemoryViewerControl::RenderMemViewer(HWND hTarget)
 					notes |= (g_MemoryDialog.Notes().FindCodeNote(addr + j) != NULL) ? (1 << j) : 0;
 					const MemBookmark* bm = g_MemBookmarkDialog.FindBookmark(addr + j);
 					bookmarks |= (bm != NULL) ? (1 << j) : 0;
-					freeze |= (bm != NULL && bm->Frozen()) ? (1 << j) : 0;
+					freeze |= ( bm != NULL && bm->Frozen() ) ? ( 1 << j ) : 0;
+
+					if ( bm != NULL && bm->Frozen() )
+					{
+						if ( g_MemBookmarkDialog.GetHWND() != nullptr )
+							g_MemBookmarkDialog.WriteFrozenValue( *bm );
+					}
 				}
 
 				g_MemManager.ActiveBankRAMRead(data, addr, 16);
@@ -829,9 +842,6 @@ INT_PTR Dlg_Memory::MemoryProc( HWND hDlg, UINT nMsg, WPARAM wParam, LPARAM lPar
 		{
 			g_MemoryDialog.m_hWnd = hDlg;
 
-			RECT rc;
-			GetWindowRect( g_RAMainWnd, &rc );
-			SetWindowPos( hDlg, NULL, rc.right, rc.top, NULL, NULL, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW );
 			GenerateResizes( hDlg );
 
 			CheckDlgButton( hDlg, IDC_RA_CBO_SEARCHALL, BST_CHECKED );
@@ -872,6 +882,7 @@ INT_PTR Dlg_Memory::MemoryProc( HWND hDlg, UINT nMsg, WPARAM wParam, LPARAM lPar
 			g_MemoryDialog.OnLoad_NewRom();
 
 			// Add a single column for list view
+			RECT rc;
 			LVCOLUMN Col;
 			Col.mask = LVCF_FMT | LVCF_ORDER | LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH;
 			Col.fmt = LVCFMT_CENTER;
@@ -894,6 +905,7 @@ INT_PTR Dlg_Memory::MemoryProc( HWND hDlg, UINT nMsg, WPARAM wParam, LPARAM lPar
 			for ( size_t i = 0; i < bankIDs.size(); ++i )
 				AddBank( bankIDs[ i ] );
 
+			RestoreWindowPosition( hDlg, "Memory Inspector", true, false );
 			return TRUE;
 		}
 
@@ -939,7 +951,7 @@ INT_PTR Dlg_Memory::MemoryProc( HWND hDlg, UINT nMsg, WPARAM wParam, LPARAM lPar
 
 						const CodeNotes::CodeNoteObj* pSavedNote = m_CodeNotes.FindCodeNote( currentResult.m_nAddr );
 						if ( ( pSavedNote != NULL ) && ( pSavedNote->Note().length() > 0 ) )
-							_tcscat( buffer, tstring( "   (" + pSavedNote->Note() + ")" ).c_str() );
+							_tcscat_s( buffer, tstring( "   (" + pSavedNote->Note() + ")" ).c_str() );
 
 						COLORREF color;
 
@@ -1030,8 +1042,14 @@ INT_PTR Dlg_Memory::MemoryProc( HWND hDlg, UINT nMsg, WPARAM wParam, LPARAM lPar
 
 			for ( ResizeContent content : vDlgMemoryResize )
 				content.Resize( winRect.Width(), winRect.Height() );
+
+			RememberWindowSize( hDlg, "Memory Inspector" );
 		}
 		return TRUE;
+
+		case WM_MOVE:
+			RememberWindowPosition( hDlg, "Memory Inspector" );
+			break;
 
 		case WM_COMMAND:
 		{
@@ -1615,10 +1633,10 @@ void Dlg_Memory::OnLoad_NewRom()
 
 void Dlg_Memory::Invalidate()
 {
-	MemoryViewerControl::Invalidate();
-
 	if ( g_MemBookmarkDialog.GetHWND() != nullptr )
 		g_MemBookmarkDialog.UpdateBookmarks( FALSE );
+
+	MemoryViewerControl::Invalidate();
 }
 
 void Dlg_Memory::SetWatchingAddress(unsigned int nAddr)

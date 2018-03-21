@@ -2,7 +2,7 @@
 
 #include "RA_Defs.h"
 #include "RA_Interface.h"
-//#include <stdio.h>
+#include <stdio.h>
 
 #if defined RA_EXPORTS
 #define API __declspec(dllexport)
@@ -151,3 +151,7 @@ extern std::string GetFolderFromDialog();
 extern BOOL RemoveFileIfExists(const std::string& sFilePath);
 
 BOOL CanCausePause();
+
+void RestoreWindowPosition(HWND hDlg, const char* sDlgKey, bool bToRight, bool bToBottom);
+void RememberWindowPosition(HWND hDlg, const char* sDlgKey);
+void RememberWindowSize(HWND hDlg, const char* sDlgKey);

@@ -140,6 +140,7 @@ void Dlg_Achievements::RemoveAchievement(HWND hList, int nIter)
 	char buffer[16];
 	sprintf_s(buffer, 16, " %d", g_pActiveAchievements->NumAchievements());
 	SetDlgItemText(m_hAchievementsDlg, IDC_RA_NUMACH, NativeStr(buffer).c_str());
+	SetDlgItemText( m_hAchievementsDlg, IDC_RA_POINT_TOTAL, NativeStr( std::to_string( g_pActiveAchievements->PointTotal() ) ).c_str() );
 
 	UpdateSelectedAchievementButtons(NULL);
 
@@ -340,6 +341,8 @@ void Dlg_Achievements::OnClickAchievementSet(AchievementSetType nAchievementSet)
 		CheckDlgButton(m_hAchievementsDlg, IDC_RA_ACTIVE_LOCAL, TRUE);
 	}
 
+	SetDlgItemText( m_hAchievementsDlg, IDC_RA_POINT_TOTAL, NativeStr( std::to_string( g_pActiveAchievements->PointTotal() ) ).c_str() );
+
 	CheckDlgButton( m_hAchievementsDlg, IDC_RA_CHKACHPROCESSINGACTIVE, g_pActiveAchievements->ProcessingActive() );
 	OnLoad_NewRom(g_pCurrentGameData->GetGameID()); // assert: calls UpdateSelectedAchievementButtons
 	g_AchievementEditorDialog.OnLoad_NewRom();
@@ -351,9 +354,6 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 	{
 	case WM_INITDIALOG:
 	{
-		RECT r;
-		GetWindowRect(g_RAMainWnd, &r);
-		SetWindowPos(hDlg, NULL, r.left, r.bottom, NULL, NULL, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
 		m_hAchievementsDlg = hDlg;
 
 		SendDlgItemMessage(hDlg, IDC_RA_ACTIVE_CORE, BM_SETCHECK, (WPARAM)0, (LONG)0);
@@ -382,6 +382,8 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 
 		//	Click the core 
 		OnClickAchievementSet(Core);
+
+		RestoreWindowPosition(hDlg, "Achievements", false, true);
 	}
 	return TRUE;
 
@@ -597,11 +599,12 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 			if (nSel == -1)
 				return FALSE;
 
-			//	Clone TO the user achievements
-			const Achievement& Ach = g_pActiveAchievements->GetAchievement(nSel);
-
 			//	switch to LocalAchievements
 			Achievement& NewClone = g_pLocalAchievements->AddAchievement();
+
+			//	Clone TO the user achievements
+			Achievement& Ach = g_pActiveAchievements->GetAchievement(nSel);
+
 			NewClone.Set(Ach);
 			NewClone.SetID(0);
 			NewClone.SetAuthor(RAUsers::LocalUser().Username());
@@ -617,6 +620,7 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 			char buffer2[16];
 			sprintf_s(buffer2, 16, " %d", g_pActiveAchievements->NumAchievements());
 			SetDlgItemText(m_hAchievementsDlg, IDC_RA_NUMACH, NativeStr(buffer2).c_str());
+			SetDlgItemText( m_hAchievementsDlg, IDC_RA_POINT_TOTAL, NativeStr( std::to_string( g_pActiveAchievements->PointTotal() ) ).c_str() );
 
 			NewClone.SetModified(TRUE);
 			UpdateSelectedAchievementButtons(&NewClone);
@@ -673,7 +677,7 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 				if (g_pActiveAchievements->SaveToFile())
 				{
 					MessageBox(hDlg, TEXT("Saved OK!"), TEXT("OK"), MB_OK);
-					for ( int i = 0; i < g_pActiveAchievements->NumAchievements(); i++ )
+					for ( unsigned int i = 0; i < g_pActiveAchievements->NumAchievements(); i++ )
 						g_pActiveAchievements->GetAchievement( i ).SetModified( FALSE );
 
 					InvalidateRect( hDlg, NULL, TRUE );
@@ -910,6 +914,14 @@ INT_PTR Dlg_Achievements::AchievementsProc(HWND hDlg, UINT nMsg, WPARAM wParam, 
 	case WM_CLOSE:
 		EndDialog(hDlg, TRUE);
 		return TRUE;
+
+	case WM_MOVE:
+		RememberWindowPosition(hDlg, "Achievements");
+		break;
+
+	case WM_SIZE:
+		RememberWindowSize(hDlg, "Achievements");
+		break;
 	}
 
 	return FALSE;	//	Unhandled
@@ -1114,6 +1126,7 @@ void Dlg_Achievements::OnLoad_NewRom(GameID nGameID)
 
 		sprintf_s(buffer, " %d", g_pActiveAchievements->NumAchievements());
 		SetDlgItemText(m_hAchievementsDlg, IDC_RA_NUMACH, NativeStr(buffer).c_str());
+		SetDlgItemText( m_hAchievementsDlg, IDC_RA_POINT_TOTAL, NativeStr( std::to_string( g_pActiveAchievements->PointTotal() ) ).c_str() );
 	}
 
 	UpdateSelectedAchievementButtons(NULL);
@@ -1138,6 +1151,8 @@ void Dlg_Achievements::OnEditAchievement(const Achievement& ach)
 	if (nIndex < g_pActiveAchievements->NumAchievements())
 	{
 		OnEditData(nIndex, Dlg_Achievements::Points, std::to_string(ach.Points()));
+
+		SetDlgItemText( m_hAchievementsDlg, IDC_RA_POINT_TOTAL, NativeStr( std::to_string( g_pActiveAchievements->PointTotal() ) ).c_str() );
 
 		if (g_nActiveAchievementSet == Core)
 			OnEditData(nIndex, Dlg_Achievements::Modified, "Yes");

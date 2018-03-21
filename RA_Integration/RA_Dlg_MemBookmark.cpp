@@ -111,9 +111,6 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 	{
 		case WM_INITDIALOG:
 		{
-			RECT rc;
-			GetWindowRect( g_MemoryDialog.GetHWND(), &rc );
-			SetWindowPos( hDlg, NULL, rc.left - 64, rc.top + 64, NULL, NULL, SWP_NOSIZE | SWP_NOZORDER );
 			GenerateResizes( hDlg );
 
 			m_hMemBookmarkDialog = hDlg;
@@ -128,6 +125,7 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 				ImportFromFile( file );
 			}
 
+			RestoreWindowPosition( hDlg, "Memory Bookmarks", true, false );
 			return TRUE;
 		}
 
@@ -147,13 +145,19 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 				content.Resize( winRect.Width(), winRect.Height() );
 
 			//InvalidateRect( hDlg, NULL, TRUE );
+			RememberWindowSize(hDlg, "Memory Bookmarks");
 		}
 		break;
+
+		case WM_MOVE:
+			RememberWindowPosition(hDlg, "Memory Bookmarks");
+			break;
 
 		case WM_MEASUREITEM:
 			pmis = (PMEASUREITEMSTRUCT)lParam;
 			pmis->itemHeight = 16;
 			return TRUE;
+
 		case WM_DRAWITEM:
 		{
 			pdis = (PDRAWITEMSTRUCT)lParam;
@@ -177,9 +181,9 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 					// Draw Item Label - Column 0
 					wchar_t buffer[ 512 ];
 					if ( m_vBookmarks[ pdis->itemID ]->Decimal() )
-						swprintf ( buffer, sizeof( buffer ), L"(D)%s", m_vBookmarks[ pdis->itemID ]->Description().c_str() );
+						swprintf_s ( buffer, 512, L"(D)%s", m_vBookmarks[ pdis->itemID ]->Description().c_str() );
 					else
-						swprintf ( buffer, sizeof( buffer ), L"%s", m_vBookmarks[ pdis->itemID ]->Description().c_str() );
+						swprintf_s ( buffer, 512, L"%s", m_vBookmarks[ pdis->itemID ]->Description().c_str() );
 
 					if ( pdis->itemState & ODS_SELECTED )
 					{
@@ -224,39 +228,39 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 						switch ( i )
 						{
 							case CSI_ADDRESS:
-								swprintf ( buffer, sizeof( buffer ), L"%06x", m_vBookmarks[ pdis->itemID ]->Address() );
+								swprintf_s ( buffer, 512, L"%06x", m_vBookmarks[ pdis->itemID ]->Address() );
 								break;
 							case CSI_VALUE:
 								if ( m_vBookmarks[ pdis->itemID ]->Decimal() )
-									swprintf ( buffer, sizeof( buffer ), L"%u", m_vBookmarks[ pdis->itemID ]->Value() );
+									swprintf_s ( buffer, 512, L"%u", m_vBookmarks[ pdis->itemID ]->Value() );
 								else
 								{
 									switch ( m_vBookmarks[ pdis->itemID ]->Type() )
 									{
-										case 1: swprintf ( buffer, sizeof( buffer ), L"%02x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
-										case 2: swprintf ( buffer, sizeof( buffer ), L"%04x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
-										case 3: swprintf ( buffer, sizeof( buffer ), L"%08x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
+										case 1: swprintf_s ( buffer, 512, L"%02x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
+										case 2: swprintf_s ( buffer, 512, L"%04x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
+										case 3: swprintf_s ( buffer, 512, L"%08x", m_vBookmarks[ pdis->itemID ]->Value() ); break;
 									}
 								}
 								break;
 							case CSI_PREVIOUS:
 								if ( m_vBookmarks[ pdis->itemID ]->Decimal() )
-									swprintf ( buffer, sizeof( buffer ), L"%u", m_vBookmarks[ pdis->itemID ]->Previous() );
+									swprintf_s ( buffer, 512, L"%u", m_vBookmarks[ pdis->itemID ]->Previous() );
 								else
 								{
 									switch ( m_vBookmarks[ pdis->itemID ]->Type() )
 									{
-										case 1: swprintf ( buffer, sizeof( buffer ), L"%02x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
-										case 2: swprintf ( buffer, sizeof( buffer ), L"%04x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
-										case 3: swprintf ( buffer, sizeof( buffer ), L"%08x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
+										case 1: swprintf_s ( buffer, 512, L"%02x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
+										case 2: swprintf_s ( buffer, 512, L"%04x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
+										case 3: swprintf_s ( buffer, 512, L"%08x", m_vBookmarks[ pdis->itemID ]->Previous() ); break;
 									}
 								}
 								break;
 							case CSI_CHANGES:
-								swprintf ( buffer, sizeof( buffer ), L"%d", m_vBookmarks[ pdis->itemID ]->Count() );
+								swprintf_s ( buffer, 512, L"%d", m_vBookmarks[ pdis->itemID ]->Count() );
 								break;
 							default:
-								swprintf ( buffer, sizeof( buffer ), L"" );
+								swprintf_s ( buffer, 512, L"" );
 								break;
 						}
 
@@ -293,6 +297,7 @@ INT_PTR Dlg_MemBookmark::MemBookmarkDialogProc( HWND hDlg, UINT uMsg, WPARAM wPa
 			}
 			return TRUE;
 		}
+
 		case WM_NOTIFY:
 		{
 			switch ( LOWORD( wParam ) )
@@ -611,21 +616,34 @@ void Dlg_MemBookmark::ClearAllBookmarks()
 
 void Dlg_MemBookmark::WriteFrozenValue( const MemBookmark & Bookmark )
 {
+	if ( !Bookmark.Frozen() )
+		return;
+
 	unsigned int addr;
+	unsigned int width;
 	int n;
 	char c;
 
 	switch ( Bookmark.Type() )
 	{
-		case 1: addr = Bookmark.Address();		break;
-		case 2: addr = Bookmark.Address() + 1;	break;
-		case 3: addr = Bookmark.Address() + 3;	break;
+		case 1: 
+			addr = Bookmark.Address();		
+			width = 2;
+			break;
+		case 2: 
+			addr = Bookmark.Address() + 1;	
+			width = 4;
+			break;
+		case 3: 
+			addr = Bookmark.Address() + 3;	
+			width = 8;
+			break;
 		default:
 			break;
 	}
 
 	char buffer[ 32 ];
-	sprintf_s ( buffer, sizeof(buffer), "%x", Bookmark.Value() );
+	sprintf_s ( buffer, sizeof(buffer), "%0*x", width, Bookmark.Value() );
 
 	for ( unsigned int i = 0; i < strlen( buffer ); i++ )
 	{
@@ -689,47 +707,53 @@ void Dlg_MemBookmark::ExportJSON()
 			hr = pDlg->SetFileName( Widen( defaultFileName ).c_str() );
 			if ( hr == S_OK )
 			{
-				IShellItem* pItem = nullptr;
-				SHCreateItemFromParsingName( Widen( defaultDir ).c_str(), NULL, IID_PPV_ARGS( &pItem ) );
-				hr = pDlg->SetDefaultFolder( pItem );
+				PIDLIST_ABSOLUTE pidl;
+				hr = SHParseDisplayName( Widen( defaultDir ).c_str(), NULL, &pidl, SFGAO_FOLDER, 0 );
 				if ( hr == S_OK )
 				{
-					pDlg->SetDefaultExtension( L"txt" );
-					hr = pDlg->Show( nullptr );
+					IShellItem* pItem = nullptr;
+					SHCreateShellItem( NULL, NULL, pidl, &pItem );
+					hr = pDlg->SetDefaultFolder( pItem );
 					if ( hr == S_OK )
 					{
-						
-						hr = pDlg->GetResult( &pItem );
+						pDlg->SetDefaultExtension( L"txt" );
+						hr = pDlg->Show( nullptr );
 						if ( hr == S_OK )
 						{
-							LPWSTR pStr = nullptr;
-							hr = pItem->GetDisplayName( SIGDN_FILESYSPATH, &pStr );
+
+							hr = pDlg->GetResult( &pItem );
 							if ( hr == S_OK )
 							{
-								Document doc;
-								Document::AllocatorType& allocator = doc.GetAllocator();
-								doc.SetObject();
-
-								Value bookmarks( kArrayType );
-								for ( MemBookmark* bookmark : m_vBookmarks )
+								LPWSTR pStr = nullptr;
+								hr = pItem->GetDisplayName( SIGDN_FILESYSPATH, &pStr );
+								if ( hr == S_OK )
 								{
-									Value item( kObjectType );
-									char buffer[ 256 ];
-									sprintf_s( buffer, Narrow( bookmark->Description() ).c_str(), sizeof( buffer ) );
-									Value s( buffer, allocator );
+									Document doc;
+									Document::AllocatorType& allocator = doc.GetAllocator();
+									doc.SetObject();
 
-									item.AddMember( "Description", s, allocator );
-									item.AddMember( "Address", bookmark->Address(), allocator );
-									item.AddMember( "Type", bookmark->Type(), allocator );
-									item.AddMember( "Decimal", bookmark->Decimal(), allocator );
-									bookmarks.PushBack( item, allocator );
+									Value bookmarks( kArrayType );
+									for ( MemBookmark* bookmark : m_vBookmarks )
+									{
+										Value item( kObjectType );
+										char buffer[ 256 ];
+										sprintf_s( buffer, Narrow( bookmark->Description() ).c_str(), sizeof( buffer ) );
+										Value s( buffer, allocator );
+
+										item.AddMember( "Description", s, allocator );
+										item.AddMember( "Address", bookmark->Address(), allocator );
+										item.AddMember( "Type", bookmark->Type(), allocator );
+										item.AddMember( "Decimal", bookmark->Decimal(), allocator );
+										bookmarks.PushBack( item, allocator );
+									}
+									doc.AddMember( "Bookmarks", bookmarks, allocator );
+
+									_WriteBufferToFile( Narrow( pStr ), doc );
 								}
-								doc.AddMember( "Bookmarks", bookmarks, allocator );
 
-								_WriteBufferToFile( Narrow( pStr ), doc );
+								pItem->Release();
+								ILFree( pidl );
 							}
-
-							pItem->Release();
 						}
 					}
 				}
@@ -759,7 +783,7 @@ void Dlg_MemBookmark::ImportFromFile( std::string sFilename )
 					MemBookmark* NewBookmark = new MemBookmark();
 
 					wchar_t buffer[ 256 ];
-					swprintf ( buffer, 256, L"%s", Widen( BookmarksData[ i ][ "Description" ].GetString() ).c_str() );
+					swprintf_s ( buffer, 256, L"%s", Widen( BookmarksData[ i ][ "Description" ].GetString() ).c_str() );
 					NewBookmark->SetDescription ( buffer );
 
 					NewBookmark->SetAddress( BookmarksData[ i ][ "Address" ].GetUint() );
