@@ -291,3 +291,10 @@
 /RetroAchievementsKey
 /*.opendb
 /RAVBA-M/dependencies/libpng/project/vs2012/Win32/Release/libpng.lib
+/RALibretro/.vs/
+/RALibretro/Debug/
+/RALibretro/Release/
+/RALibretro/src/Debug/
+/RALibretro/src/Release/
+/RALibretro/src/*.user
+
