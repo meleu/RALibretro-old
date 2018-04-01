@@ -32,8 +32,6 @@ bool Video::init(libretro::LoggerComponent* logger, Config* config)
   _logger = logger;
   _config = config;
 
-  _preserveAspect = false;
-  _linearFilter = false;
   _pixelFormat = RETRO_PIXEL_FORMAT_UNKNOWN;
   _windowWidth = _windowHeight = 0;
   _textureWidth = _textureHeight = 0;
@@ -43,6 +41,10 @@ bool Video::init(libretro::LoggerComponent* logger, Config* config)
   _texture = 0;
   _framebuffer = 0;
   _renderbuffer = 0;
+
+  _preserveAspect = false;
+  _linearFilter = false;
+  _hwRender = false;
 
   _program = createProgram(&_posAttribute, &_uvAttribute, &_texUniform);
 
@@ -116,25 +118,51 @@ void Video::draw()
 
 bool Video::setGeometry(unsigned width, unsigned height, float aspect, enum retro_pixel_format pixelFormat, const struct retro_hw_render_callback* hwRenderCallback)
 {
-  (void)width;
-  (void)height;
-  (void)hwRenderCallback;
+  _hwRender = hwRenderCallback != NULL;
 
-  if (pixelFormat != _pixelFormat && _texture != 0)
+  if (!_hwRender)
   {
-    Gl::deleteTextures(1, &_texture);
-    _textureWidth = _textureHeight = 0;
+    // Software framebuffer
+    if (pixelFormat != _pixelFormat && _texture != 0)
+    {
+      _textureWidth = _textureHeight = 0;
+    }
+
+    _aspect = aspect;
+    _pixelFormat = pixelFormat;
+
+    _logger->printf(RETRO_LOG_DEBUG, "Geometry set to %u x %u (1:%f)", width, height, aspect);
   }
-
-  _aspect = aspect;
-  _pixelFormat = pixelFormat;
-
-  _logger->printf(RETRO_LOG_DEBUG, "Geometry set to %u x %u (1:%f)", width, height, aspect);
-
-#if 0
-  if (hwRenderCallback != NULL)
+  else
   {
     // Hardware framebuffer
+    if (_texture != 0)
+    {
+      Gl::deleteTextures(1, &_texture);
+    }
+
+    Gl::genTextures(1, &_texture);
+    Gl::bindTexture(GL_TEXTURE_2D, _texture);
+
+    Gl::texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    Gl::texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    switch (pixelFormat)
+    {
+    case RETRO_PIXEL_FORMAT_XRGB8888:
+      Gl::texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+      break;
+
+    case RETRO_PIXEL_FORMAT_RGB565:
+      Gl::texImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, NULL);
+      break;
+
+    case RETRO_PIXEL_FORMAT_0RGB1555:
+    default:
+      Gl::texImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_SHORT_1_5_5_5_REV, NULL);
+      break;
+    }
+
     Gl::genFramebuffers(1, &_framebuffer);
     Gl::bindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
 
@@ -155,14 +183,13 @@ bool Video::setGeometry(unsigned width, unsigned height, float aspect, enum retr
       return false;
     }
   }
-#endif
 
   return true;
 }
 
 void Video::refresh(const void* data, unsigned width, unsigned height, size_t pitch)
 {
-  if (data != NULL && data != RETRO_HW_FRAME_BUFFER_VALID)
+  if (data != NULL && data != RETRO_HW_FRAME_BUFFER_VALID && !_hwRender)
   {
     bool updateVertexBuffer = false;
 
@@ -248,7 +275,7 @@ bool Video::supportsContext(enum retro_hw_context_type type)
 
 uintptr_t Video::getCurrentFramebuffer()
 {
-  return 0;
+  return _framebuffer;
 }
 
 retro_proc_address_t Video::getProcAddress(const char* symbol)

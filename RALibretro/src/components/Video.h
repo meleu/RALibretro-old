@@ -77,4 +77,6 @@ protected:
 
   bool                    _preserveAspect;
   bool                    _linearFilter;
+
+  bool                    _hwRender;
 };
