@@ -78,7 +78,7 @@ bool Application::init(const char* title, int width, int height)
     kAllocatorInited,
     kSdlInited,
     kWindowInited,
-    kRendererInited,
+    kGlInited,
     kAudioDeviceInited,
     kFifoInited,
     kAudioInited,
@@ -117,6 +117,17 @@ bool Application::init(const char* title, int width, int height)
   inited = kSdlInited;
 
   // Setup window
+  if (SDL_GL_LoadLibrary(NULL) != 0)
+  {
+    _logger.printf(RETRO_LOG_ERROR, "SDL_GL_LoadLibrary: %s", SDL_GetError());
+    goto error;
+  }
+
+  SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
   _window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
   if (_window == NULL)
@@ -125,50 +136,33 @@ bool Application::init(const char* title, int width, int height)
     goto error;
   }
 
-  inited = kWindowInited;
-
   {
-    int numdrivers = SDL_GetNumRenderDrivers();
-    _logger.printf(RETRO_LOG_INFO, "Render driver count: %d", numdrivers);
-    
-    for (int i = 0; i < numdrivers; i++)
+    SDL_GLContext context = SDL_GL_CreateContext(_window);
+
+    if (SDL_GL_MakeCurrent(_window, context) != 0)
     {
-      SDL_RendererInfo drinfo;
-      SDL_GetRenderDriverInfo(i, &drinfo);
-      
-      _logger.printf(RETRO_LOG_INFO, "Driver %d name: %s", i, drinfo.name);
-      
-      if (drinfo.flags & SDL_RENDERER_SOFTWARE)
-      {
-        _logger.printf(RETRO_LOG_INFO, "  the renderer is a software fallback");
-      }
-      
-      if (drinfo.flags & SDL_RENDERER_ACCELERATED)
-      {
-        _logger.printf(RETRO_LOG_INFO, "  the renderer uses hardware acceleration");
-      }
-      
-      if (drinfo.flags & SDL_RENDERER_PRESENTVSYNC)
-      {
-        _logger.printf(RETRO_LOG_INFO, "  present is synchronized with the refresh rate");
-      }
-      
-      if (drinfo.flags & SDL_RENDERER_TARGETTEXTURE)
-      {
-        _logger.printf(RETRO_LOG_INFO, "  the renderer supports rendering to texture");
-      }
+      _logger.printf(RETRO_LOG_ERROR, "SDL_GL_MakeCurrent: %s", SDL_GetError());
+      goto error;
     }
   }
 
-  _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  SDL_GL_SetSwapInterval(1);
 
-  if (_renderer == NULL)
+  int major, minor;
+  SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major);
+  SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor);
+  _logger.printf(RETRO_LOG_ERROR, "Got OpenGL %d.%d", major, minor);
+
+  inited = kWindowInited;
+
+  Gl::init(&_logger);
+
+  if (!Gl::ok())
   {
-    _logger.printf(RETRO_LOG_ERROR, "SDL_CreateRenderer: %s", SDL_GetError());
-    goto error;
+	goto error;
   }
 
-  inited = kRendererInited;
+  inited = kGlInited;
 
   // Init audio
   SDL_AudioSpec want;
@@ -230,7 +224,7 @@ bool Application::init(const char* title, int width, int height)
 
   inited = kKeyBindsInited;
 
-  if (!_video.init(&_logger, &_config, _renderer))
+  if (!_video.init(&_logger, &_config))
   {
     goto error;
   }
@@ -277,7 +271,7 @@ error:
   case kAudioInited:       _audio.destroy();
   case kFifoInited:        _fifo.destroy();
   case kAudioDeviceInited: SDL_CloseAudioDevice(_audioDev);
-  case kRendererInited:    SDL_DestroyRenderer(_renderer);
+  case kGlInited:          // nothing to undo
   case kWindowInited:      SDL_DestroyWindow(_window);
   case kSdlInited:         SDL_Quit();
   case kAllocatorInited:   _allocator.destroy();
@@ -318,6 +312,10 @@ void Application::run()
       case SDL_KEYUP:
       case SDL_KEYDOWN:
         handle(&event.key);
+        break;
+
+      case SDL_WINDOWEVENT:
+        handle(&event.window);
         break;
       }
     }
@@ -362,9 +360,9 @@ void Application::run()
       RA_DoAchievementsFrame();
     }
 
-    SDL_RenderClear(_renderer);
+    Gl::clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     _video.draw();
-    SDL_RenderPresent(_renderer);
+    SDL_GL_SwapWindow(_window);
 
     RA_HandleHTTPResults();
 
@@ -427,7 +425,6 @@ void Application::destroy()
   _fifo.destroy();
 
   SDL_CloseAudioDevice(_audioDev);
-  SDL_DestroyRenderer(_renderer);
   SDL_DestroyWindow(_window);
   SDL_Quit();
 
@@ -1496,12 +1493,13 @@ void Application::handle(const SDL_SysWMEvent* syswm)
     case IDM_SYSTEM_MEDNAFENNGP:
     case IDM_SYSTEM_MEDNAFENVB:
     case IDM_SYSTEM_FBALPHA:
+    case IDM_SYSTEM_MUPEN64PLUS:
       {
         static Emulator emulators[] =
         {
           Emulator::kStella, Emulator::kSnes9x, Emulator::kPicoDrive, Emulator::kGenesisPlusGx, Emulator::kFceumm,
           Emulator::kHandy, Emulator::kBeetleSgx, Emulator::kGambatte, Emulator::kMGBA, Emulator::kMednafenPsx,
-          Emulator::kMednafenNgp, Emulator::kMednafenVb, Emulator::kFBAlpha
+          Emulator::kMednafenNgp, Emulator::kMednafenVb, Emulator::kFBAlpha, Emulator::kMupen64Plus
         };
 
         _fsm.loadCore(emulators[cmd - IDM_SYSTEM_STELLA]);
@@ -1600,6 +1598,14 @@ void Application::handle(const SDL_SysWMEvent* syswm)
 
       break;
     }
+  }
+}
+
+void Application::handle(const SDL_WindowEvent* window)
+{
+  if (window->event == SDL_WINDOWEVENT_SIZE_CHANGED)
+  {
+    _video.windowResized(window->data1, window->data2);
   }
 }
 
