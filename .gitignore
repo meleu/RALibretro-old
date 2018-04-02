@@ -298,3 +298,5 @@
 /RALibretro/src/Release/
 /RALibretro/src/*.user
 
+
+RA_Integration/RA_Interface\.o
