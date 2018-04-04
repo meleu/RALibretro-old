@@ -56,6 +56,7 @@ public:
     kSetWindowSize4,
     // Emulation speed
     kPauseToggle,
+    kPauseToggleNoOvl,
     kFastForward,
     kStep,
     // Screenshot

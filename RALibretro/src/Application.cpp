@@ -338,6 +338,7 @@ void Application::run()
       break;
 
     case Fsm::State::GamePaused:
+    case Fsm::State::GamePausedNoOvl:
     default:
       limit = 0;
       audio = false;
@@ -1695,6 +1696,18 @@ void Application::handle(const SDL_KeyboardEvent* key)
     else
     {
       _fsm.pauseGame();
+    }
+
+    break;
+
+  case KeyBinds::Action::kPauseToggleNoOvl:
+    if (_fsm.currentState() == Fsm::State::GamePausedNoOvl)
+    {
+      _fsm.resumeGame();
+    }
+    else
+    {
+      _fsm.pauseGameNoOvl();
     }
 
     break;
