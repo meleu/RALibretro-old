@@ -1,9 +1,13 @@
-[submodule "RA_Integration/rapidjson"]
-	path = RA_Integration/rapidjson
-	url = https://github.com/miloyip/rapidjson
-[submodule "RALibretro/src/jsonsax"]
-	path = RALibretro/src/jsonsax
-	url = https://github.com/leiradel/jsonsax.git
-[submodule "RALibretro/src/miniz"]
-	path = RALibretro/src/miniz
+[submodule "src/RA_Integration"]
+	path = src/RA_Integration
+	url = https://github.com/RetroAchievements/RASuite.git
+	branch = raintegration_only
+[submodule "src/SDL2"]
+	path = src/SDL2
+	url = https://github.com/RetroAchievements/SDL2
+[submodule "src/jsonsax"]
+	path = src/jsonsax
+	url = https://github.com/leiradel/jsonsax
+[submodule "src/miniz"]
+	path = src/miniz
 	url = https://github.com/richgel999/miniz.git
