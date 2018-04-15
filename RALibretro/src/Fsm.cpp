@@ -1378,6 +1378,11 @@ bool Fsm::step() {
         return false;
       }
 
+
+      if (ctx.hardcore()) {
+        return false;
+      }
+    
       __state = State::FrameStep;
       after(__state);
       after();

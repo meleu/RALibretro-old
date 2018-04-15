@@ -82,7 +82,11 @@ fsm Fsm {
       ctx.resetGame();
     }
 
-    step() => FrameStep;
+    step() => FrameStep {
+      if (ctx.hardcore()) {
+        forbid;
+      }
+    }
     
     turbo() => GameTurbo {
       if (ctx.hardcore()) {
