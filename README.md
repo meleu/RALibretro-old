@@ -1,3 +1,5 @@
+# The RALibretro development now happens in https://github.com/RetroAchievements/RALibretro
+
 RASuite
 =======
 
